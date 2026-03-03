@@ -92,7 +92,7 @@ fixbot_FindDeadMonster(edict_t *self)
 			continue;
 		}
 
-		if (ent->health > 0)
+		if ((ent->health > 0) || (ent->health <= ent->gib_health))
 		{
 			continue;
 		}
