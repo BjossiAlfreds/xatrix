@@ -27,6 +27,9 @@
 #include "../../header/local.h"
 #include "medic.h"
 
+void M_FliesOn(edict_t *self);
+void M_FliesOff(edict_t *self);
+
 static int sound_idle1;
 static int sound_pain1;
 static int sound_pain2;
@@ -104,7 +107,8 @@ medic_FindDeadMonster(edict_t *self)
 			continue;
 		}
 
-		if (ent->nextthink)
+		if (ent->nextthink &&
+			((ent->think != M_FliesOn) && (ent->think != M_FliesOff)))
 		{
 			continue;
 		}
@@ -876,6 +880,9 @@ medic_cable_attack(edict_t *self)
 	}
 	else if (self->s.frame == FRAME_attack50)
 	{
+		self->enemy->s.effects &= ~EF_FLIES;
+		self->enemy->s.sound = 0;
+
 		self->enemy->spawnflags = 0;
 		self->enemy->monsterinfo.aiflags = 0;
 		self->enemy->target = NULL;
