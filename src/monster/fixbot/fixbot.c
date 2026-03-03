@@ -18,6 +18,7 @@ qboolean visible(edict_t *self, edict_t *other);
 qboolean infront(edict_t *self, edict_t *other);
 void M_FliesOn(edict_t *self);
 void M_FliesOff(edict_t *self);
+void M_SetEffects(edict_t *self);
 
 static int sound_pain1;
 static int sound_die;
@@ -1221,6 +1222,7 @@ fixbot_fire_laser(edict_t *self)
 	else
 	{
 		self->enemy->monsterinfo.aiflags |= AI_RESURRECTING;
+		M_SetEffects(self->enemy);
 	}
 }
 
