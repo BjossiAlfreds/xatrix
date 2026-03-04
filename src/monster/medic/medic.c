@@ -30,6 +30,7 @@
 qboolean visible(edict_t *self, edict_t *other);
 void M_FliesOn(edict_t *self);
 void M_FliesOff(edict_t *self);
+void M_SetEffects(edict_t *self);
 
 static int sound_idle1;
 static int sound_pain1;
@@ -878,6 +879,7 @@ medic_cable_attack(edict_t *self)
 	{
 		gi.sound(self->enemy, CHAN_AUTO, sound_hook_hit, 1, ATTN_NORM, 0);
 		self->enemy->monsterinfo.aiflags |= AI_RESURRECTING;
+		M_SetEffects(self->enemy);
 	}
 	else if (self->s.frame == FRAME_attack50)
 	{
@@ -901,6 +903,7 @@ medic_cable_attack(edict_t *self)
 		}
 
 		self->enemy->monsterinfo.aiflags |= AI_RESURRECTING;
+		M_SetEffects(self->enemy);
 
 		if (self->oldenemy && self->oldenemy->client)
 		{
@@ -945,6 +948,7 @@ medic_hook_retract(edict_t *self)
 
 	gi.sound(self, CHAN_WEAPON, sound_hook_retract, 1, ATTN_NORM, 0);
 	self->enemy->monsterinfo.aiflags &= ~AI_RESURRECTING;
+	M_SetEffects(self->enemy);
 }
 
 static mframe_t medic_frames_attackCable[] = {
