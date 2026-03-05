@@ -1171,7 +1171,6 @@ gekk_jump_takeoff(edict_t *self)
 
 	gi.sound(self, CHAN_VOICE, sound_sight, 1, ATTN_NORM, 0);
 	AngleVectors(self->s.angles, forward, NULL, NULL);
-	self->s.origin[2] += 1;
 
 	/* high jump */
 	if (gekk_check_jump(self))
@@ -1182,7 +1181,7 @@ gekk_jump_takeoff(edict_t *self)
 	else
 	{
 		VectorScale(forward, 250, self->velocity);
-		self->velocity[2] = 400;
+		self->velocity[2] = 401; /* add 1 so thud sound plays when he lands */
 	}
 
 	self->groundentity = NULL;
@@ -1194,7 +1193,8 @@ gekk_jump_takeoff(edict_t *self)
 void
 gekk_jump_takeoff2(edict_t *self)
 {
-	vec3_t forward;
+	trace_t tr;
+	vec3_t forward, dest;
 
   	if (!self)
 	{
@@ -1203,7 +1203,20 @@ gekk_jump_takeoff2(edict_t *self)
 
 	gi.sound(self, CHAN_VOICE, sound_sight, 1, ATTN_NORM, 0);
 	AngleVectors(self->s.angles, forward, NULL, NULL);
-	self->s.origin[2] = self->enemy->s.origin[2];
+
+	if (self->enemy)
+	{
+		dest[0] = self->s.origin[0];
+		dest[1] = self->s.origin[1];
+		dest[2] = self->enemy->s.origin[2];
+
+		tr = gi.trace(self->s.origin, self->mins, self->maxs, dest, self, self->clipmask);
+		if (!tr.startsolid)
+		{
+			VectorCopy(tr.endpos, self->s.origin);
+			gi.linkentity(self);
+		}
+	}
 
 	if (gekk_check_jump(self))
 	{
