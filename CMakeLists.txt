@@ -121,7 +121,7 @@ set(Xatrix-Header
 	src/monster/supertank/supertank.h
 	src/monster/tank/tank.h
 	src/savegame/tables/clientfields.h
-	src/savegame/tables/fields.h
+	src/savegame/tables/entfields.h
 	src/savegame/tables/gamefunc_decs.h
 	src/savegame/tables/gamefunc_list.h
 	src/savegame/tables/gamemmove_decs.h
