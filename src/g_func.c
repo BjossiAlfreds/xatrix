@@ -61,7 +61,11 @@ Move_Done(edict_t *ent)
 	}
 
    VectorClear(ent->velocity);
-   ent->moveinfo.endfunc(ent);
+
+	if (ent->moveinfo.endfunc)
+	{
+	   ent->moveinfo.endfunc(ent);
+	}
 }
 
 void
@@ -161,7 +165,11 @@ AngleMove_Done(edict_t *ent)
 	}
 
 	VectorClear(ent->avelocity);
-	ent->moveinfo.endfunc(ent);
+
+	if (ent->moveinfo.endfunc)
+	{
+		ent->moveinfo.endfunc(ent);
+	}
 }
 
 void
@@ -584,7 +592,11 @@ wait_and_change_think(edict_t* ent)
 {
 	void (*afterwaitfunc)(edict_t *) = ent->moveinfo.endfunc;
 	ent->moveinfo.endfunc = NULL;
-	afterwaitfunc(ent);
+
+	if (afterwaitfunc)
+	{
+		afterwaitfunc(ent);
+	}
 }
 
 /*
@@ -596,6 +608,7 @@ static void
 wait_and_change(edict_t* ent, void (*afterwaitfunc)(edict_t *))
 {
 	float waittime = coop_elevator_delay->value;
+
 	if (coop->value && waittime > 0.0f)
 	{
 		if(ent->nextthink == 0)
@@ -605,7 +618,7 @@ wait_and_change(edict_t* ent, void (*afterwaitfunc)(edict_t *))
 			ent->nextthink = level.time + waittime;
 		}
 	}
-	else
+	else if (afterwaitfunc)
 	{
 		afterwaitfunc(ent);
 
