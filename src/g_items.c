@@ -53,12 +53,28 @@ static int quad_fire_drop_timeout_hack;
 gitem_t *
 GetItemByIndex(int index)
 {
-	if ((index == 0) || (index >= game.num_items))
+	if ((index <= 0) || (index >= itemlist_len))
 	{
 		return NULL;
 	}
 
 	return &itemlist[index];
+}
+
+int
+GetWeaponAmmoIndex(const gitem_t *weap)
+{
+	if (weap && weap->ammo)
+	{
+		const gitem_t *ammo = FindItem(weap->ammo);
+
+		if (ammo)
+		{
+			return ITEM_INDEX(ammo);
+		}
+	}
+
+	return 0;
 }
 
 gitem_t *
@@ -74,7 +90,7 @@ FindItemByClassname(const char *classname)
 
 	it = itemlist;
 
-	for (i = 0; i < game.num_items; i++, it++)
+	for (i = 0; i < itemlist_len; i++, it++)
 	{
 		if (!it->classname)
 		{
@@ -103,7 +119,7 @@ FindItem(const char *pickup_name)
 
 	it = itemlist;
 
-	for (i = 0; i < game.num_items; i++, it++)
+	for (i = 0; i < itemlist_len; i++, it++)
 	{
 		if (!it->pickup_name)
 		{
@@ -220,7 +236,7 @@ Drop_General(edict_t *ent, gitem_t *item)
 
 	Drop_Item(ent, item);
 	ent->client->pers.inventory[ITEM_INDEX(item)]--;
-	ValidateSelectedItem(ent);
+	ValidateSelectedItem(ent->client);
 }
 
 /* ====================================================================== */
@@ -515,7 +531,7 @@ Use_Quad(edict_t *ent, gitem_t *item)
 	}
 
 	ent->client->pers.inventory[ITEM_INDEX(item)]--;
-	ValidateSelectedItem(ent);
+	ValidateSelectedItem(ent->client);
 
 	if (quad_drop_timeout_hack)
 	{
@@ -552,7 +568,7 @@ Use_QuadFire(edict_t *ent, gitem_t *item)
 	}
 
 	ent->client->pers.inventory[ITEM_INDEX(item)]--;
-	ValidateSelectedItem(ent);
+	ValidateSelectedItem(ent->client);
 
 	if (quad_fire_drop_timeout_hack)
 	{
@@ -587,7 +603,7 @@ Use_Breather(edict_t *ent, gitem_t *item)
 	}
 
 	ent->client->pers.inventory[ITEM_INDEX(item)]--;
-	ValidateSelectedItem(ent);
+	ValidateSelectedItem(ent->client);
 
 	if (ent->client->breather_framenum > level.framenum)
 	{
@@ -610,7 +626,7 @@ Use_Envirosuit(edict_t *ent, gitem_t *item)
 	}
 
 	ent->client->pers.inventory[ITEM_INDEX(item)]--;
-	ValidateSelectedItem(ent);
+	ValidateSelectedItem(ent->client);
 
 	if (ent->client->enviro_framenum > level.framenum)
 	{
@@ -633,7 +649,7 @@ Use_Invulnerability(edict_t *ent, gitem_t *item)
 	}
 
 	ent->client->pers.inventory[ITEM_INDEX(item)]--;
-	ValidateSelectedItem(ent);
+	ValidateSelectedItem(ent->client);
 
 	if (ent->client->invincible_framenum > level.framenum)
 	{
@@ -658,7 +674,7 @@ Use_Silencer(edict_t *ent, gitem_t *item)
 	}
 
 	ent->client->pers.inventory[ITEM_INDEX(item)]--;
-	ValidateSelectedItem(ent);
+	ValidateSelectedItem(ent->client);
 	ent->client->silencer_shots += 30;
 }
 
@@ -862,7 +878,7 @@ Drop_Ammo(edict_t *ent, gitem_t *item)
 	}
 
 	ent->client->pers.inventory[index] -= dropped->count;
-	ValidateSelectedItem(ent);
+	ValidateSelectedItem(ent->client);
 }
 
 /* ====================================================================== */
@@ -2899,6 +2915,8 @@ gitem_t itemlist[] = {
 	{NULL}
 };
 
+const int itemlist_len = ARRLEN(itemlist) - 1;
+
 /*
  * QUAKED item_health (.3 .3 1) (-16 -16 -16) (16 16 16)
  */
@@ -3018,7 +3036,6 @@ SP_item_foodcube(edict_t *self)
 void
 InitItems(void)
 {
-	game.num_items = sizeof(itemlist) / sizeof(itemlist[0]) - 1;
 }
 
 /*
@@ -3030,7 +3047,7 @@ SetItemNames(void)
 	int i;
 	gitem_t *it;
 
-	for (i = 0; i < game.num_items; i++)
+	for (i = 0; i < itemlist_len; i++)
 	{
 		it = &itemlist[i];
 		gi.configstring(CS_ITEMS + i, it->pickup_name);
