@@ -1154,9 +1154,9 @@ check_telefrag(edict_t *self)
 void
 fixbot_fire_laser(edict_t *self)
 {
-	vec3_t forward, right, up;
-	vec3_t tempang, start;
-	vec3_t dir, angles, end;
+	edict_t *patient;
+	vec3_t forward;
+	vec3_t dir, angles;
 	edict_t *ent;
 
   	if (!self)
@@ -1164,65 +1164,61 @@ fixbot_fire_laser(edict_t *self)
 		return;
 	}
 
-	/* critter dun got blown up while bein' fixed */
-	if (self->enemy->health <= self->enemy->gib_health)
+	patient = self->enemy;
+
+	if (!(self->monsterinfo.aiflags & AI_MEDIC) ||
+		!patient || !patient->inuse || patient->owner != self ||
+		patient->health <= patient->gib_health)
 	{
+		stop_heal(self);
 		self->monsterinfo.currentmove = &fixbot_move_stand;
-		self->monsterinfo.aiflags &= ~AI_MEDIC;
 		return;
 	}
 
 	gi.sound(self, CHAN_AUTO, gi.soundindex("misc/lasfly.wav"),
 		   	1, ATTN_STATIC, 0);
 
-	VectorCopy(self->s.origin, start);
-	VectorCopy(self->enemy->s.origin, end);
-	VectorSubtract(end, start, dir);
+	VectorSubtract(patient->s.origin, self->s.origin, dir);
 	vectoangles(dir, angles);
 
 	ent = G_Spawn();
 	VectorCopy(self->s.origin, ent->s.origin);
-	VectorCopy(angles, tempang);
-	AngleVectors(tempang, forward, right, up);
-	VectorCopy(tempang, ent->s.angles);
-	VectorCopy(ent->s.origin, start);
+	VectorCopy(angles, ent->s.angles);
+	AngleVectors(angles, forward, NULL, NULL);
 
-	VectorMA(start, 16, forward, start);
+	VectorMA(ent->s.origin, 16, forward, ent->s.origin);
 
-	VectorCopy(start, ent->s.origin);
-	ent->enemy = self->enemy;
+	ent->enemy = patient;
 	ent->owner = self;
 	ent->dmg = -1;
 	monster_dabeam(ent);
 
-	if (self->enemy->health > (self->enemy->mass / 10))
+	if (patient->health > (patient->mass / 10))
 	{
 		if (check_telefrag(self))
 		{
-			self->enemy->s.effects &= ~EF_FLIES;
-			self->enemy->s.sound = 0;
+			patient->s.effects &= ~EF_FLIES;
+			patient->s.sound = 0;
 
-			self->enemy->spawnflags = 0;
-			self->enemy->monsterinfo.aiflags = 0;
-			self->enemy->target = NULL;
-			self->enemy->targetname = NULL;
-			self->enemy->combattarget = NULL;
-			self->enemy->deathtarget = NULL;
-			self->enemy->owner = self;
-			ED_CallSpawn(self->enemy);
-			self->enemy->owner = NULL;
+			patient->spawnflags = 0;
+			patient->monsterinfo.aiflags = 0;
+			patient->target = NULL;
+			patient->targetname = NULL;
+			patient->combattarget = NULL;
+			patient->deathtarget = NULL;
+
+			ED_CallSpawn(patient);
+
 			self->s.origin[2] += 1;
 
-			self->enemy->monsterinfo.aiflags &= ~AI_RESURRECTING;
-
+			stop_heal(self);
 			self->monsterinfo.currentmove = &fixbot_move_stand;
-			self->monsterinfo.aiflags &= ~AI_MEDIC;
 		}
 	}
 	else
 	{
-		self->enemy->monsterinfo.aiflags |= AI_RESURRECTING;
-		M_SetEffects(self->enemy);
+		patient->monsterinfo.aiflags |= AI_RESURRECTING;
+		M_SetEffects(patient);
 	}
 }
 
