@@ -32,7 +32,7 @@
  * solid_edge items only clip against bsp models.
  */
 
-edict_t *
+static edict_t *
 SV_TestEntityPosition(edict_t *ent)
 {
 	trace_t trace;
@@ -66,7 +66,7 @@ SV_TestEntityPosition(edict_t *ent)
 	return NULL;
 }
 
-void
+static void
 SV_CheckVelocity(edict_t *ent)
 {
   	if (!ent)
@@ -85,7 +85,7 @@ SV_CheckVelocity(edict_t *ent)
  * Runs thinking code for
  * this frame if necessary
  */
-qboolean
+static qboolean
 SV_RunThink(edict_t *ent)
 {
 	float thinktime;
@@ -121,7 +121,7 @@ SV_RunThink(edict_t *ent)
  * Two entities have touched, so
  * run their touch functions
  */
-void
+static void
 SV_Impact(edict_t *e1, trace_t *trace)
 {
 	edict_t *e2;
@@ -348,7 +348,7 @@ SV_FlyMove(edict_t *ent, float time, int mask)
 	return blocked;
 }
 
-void
+static void
 SV_AddGravity(edict_t *ent)
 {
   	if (!ent)
@@ -369,7 +369,7 @@ SV_AddGravity(edict_t *ent)
  * This leads to a lot of false block tests in SV_Push
  * if another bmodel is in the vicinity.
  */
-void
+static void
 RealBoundingBox(edict_t *ent, vec3_t mins, vec3_t maxs)
 {
 	vec3_t forward, left, up, f1, l1, u1;
@@ -478,7 +478,7 @@ RealBoundingBox(edict_t *ent, vec3_t mins, vec3_t maxs)
 /*
  * Does not change the entities velocity at all
  */
-trace_t
+static trace_t
 SV_PushEntity(edict_t *ent, vec3_t push)
 {
 	trace_t trace;
@@ -561,18 +561,59 @@ typedef struct
 	vec3_t angles;
 } pushed_t;
 
-pushed_t pushed[MAX_EDICTS], *pushed_p;
-edict_t *obstacle;
+static pushed_t pushed[MAX_EDICTS], *pushed_p;
+
+static pushed_t *
+pushed_append(edict_t *e)
+{
+	if (pushed_p >= ARREND(pushed))
+	{
+		return NULL;
+	}
+
+	pushed_p->ent = e;
+	VectorCopy(e->s.origin, pushed_p->origin);
+	VectorCopy(e->s.angles, pushed_p->angles);
+
+	return pushed_p++;
+}
+
+static void
+pushed_pop(void)
+{
+	if (pushed_p > pushed)
+	{
+		pushed_p--;
+	}
+}
+
+static void
+pushed_undo(void)
+{
+	pushed_t *p;
+
+	/* go backwards, so if the same entity was pushed
+	   twice, it goes back to the original position */
+	for (p = pushed_p - 1; p >= pushed; p--)
+	{
+		VectorCopy(p->origin, p->ent->s.origin);
+		VectorCopy(p->angles, p->ent->s.angles);
+
+		gi.linkentity(p->ent);
+	}
+
+	pushed_p = pushed;
+}
 
 /*
  * Objects need to be moved back on a failed push,
  * otherwise riders would continue to slide.
  */
-qboolean
+static edict_t *
 SV_Push(edict_t *pusher, vec3_t move, vec3_t amove)
 {
-	int i, e;
-	edict_t *check, *block;
+	int i;
+	edict_t *check;
 	pushed_t *p;
 	vec3_t org, org2, move2, forward, right, up;
 	vec3_t realmins, realmaxs;
@@ -606,10 +647,10 @@ SV_Push(edict_t *pusher, vec3_t move, vec3_t amove)
 	AngleVectors(org, forward, right, up);
 
 	/* save the pusher's original position */
-	pushed_p->ent = pusher;
-	VectorCopy(pusher->s.origin, pushed_p->origin);
-	VectorCopy(pusher->s.angles, pushed_p->angles);
-	pushed_p++;
+	if (!pushed_append(pusher))
+	{
+		return NULL;
+	}
 
 	/* move the pusher to it's final position */
 	VectorAdd(pusher->s.origin, move, pusher->s.origin);
@@ -621,9 +662,7 @@ SV_Push(edict_t *pusher, vec3_t move, vec3_t amove)
 	RealBoundingBox(pusher, realmins, realmaxs);
 
 	/* see if any solid entities are inside the final position */
-	check = g_edicts + 1;
-
-	for (e = 1; e < globals.num_edicts; e++, check++)
+	for (check = g_edicts + 1; check < &g_edicts[globals.num_edicts]; check++)
 	{
 		if (!check->inuse)
 		{
@@ -667,11 +706,10 @@ SV_Push(edict_t *pusher, vec3_t move, vec3_t amove)
 		if ((pusher->movetype == MOVETYPE_PUSH) ||
 			(check->groundentity == pusher))
 		{
-			/* move this entity */
-			pushed_p->ent = check;
-			VectorCopy(check->s.origin, pushed_p->origin);
-			VectorCopy(check->s.angles, pushed_p->angles);
-			pushed_p++;
+			if (!pushed_append(check))
+			{
+				continue;
+			}
 
 			/* try moving the contacted entity */
 			VectorAdd(check->s.origin, move, check->s.origin);
@@ -706,44 +744,27 @@ SV_Push(edict_t *pusher, vec3_t move, vec3_t amove)
 				check->groundentity = NULL;
 			}
 
-			block = SV_TestEntityPosition(check);
-
-			if (!block)
+			if (!SV_TestEntityPosition(check))
 			{
-				/* pushed ok */
 				gi.linkentity(check);
-
-				/* impact? */
 				continue;
 			}
 
 			/* if it is ok to leave in the old position, do it this
 			   is only relevent for riding entities, not pushed */
 			VectorSubtract(check->s.origin, move, check->s.origin);
-			block = SV_TestEntityPosition(check);
 
-			if (!block)
+			if (!SV_TestEntityPosition(check))
 			{
-				pushed_p--;
+				pushed_pop();
 				continue;
 			}
 		}
 
-		/* save off the obstacle so we can call the block function */
-		obstacle = check;
+		/* move back any entities we already moved */
+		pushed_undo();
 
-		/* move back any entities we already moved
-		   go backwards, so if the same entity was pushed
-		   twice, it goes back to the original position */
-		for (p = pushed_p - 1; p >= pushed; p--)
-		{
-			VectorCopy(p->origin, p->ent->s.origin);
-			VectorCopy(p->angles, p->ent->s.angles);
-
-			gi.linkentity(p->ent);
-		}
-
-		return false;
+		return check;
 	}
 
 	/* see if anything we moved has touched a trigger */
@@ -752,18 +773,17 @@ SV_Push(edict_t *pusher, vec3_t move, vec3_t amove)
 		G_TouchTriggers(p->ent);
 	}
 
-	return true;
+	return NULL;
 }
 
 /*
  * Bmodel objects don't interact with each
  * other, but push all box objects
  */
-void
+static void
 SV_Physics_Pusher(edict_t *ent)
 {
-	vec3_t move, amove;
-	edict_t *part, *mv;
+	edict_t *part, *mv, *obstacle;
 
   	if (!ent)
 	{
@@ -781,20 +801,25 @@ SV_Physics_Pusher(edict_t *ent)
 	   any moves or calling any think functions. if the move
 	   is blocked, all moved objects will be backed out */
 	pushed_p = pushed;
+	obstacle = NULL;
 
 	for (part = ent; part; part = part->teamchain)
 	{
-		if (part->velocity[0] || part->velocity[1] || part->velocity[2] ||
-			part->avelocity[0] || part->avelocity[1] || part->avelocity[2])
-		{
-			/* object is moving */
-			VectorScale(part->velocity, FRAMETIME, move);
-			VectorScale(part->avelocity, FRAMETIME, amove);
+		vec3_t move, amove;
 
-			if (!SV_Push(part, move, amove))
-			{
-				break; /* move was blocked */
-			}
+		if (VectorCompare(part->velocity, vec3_origin) &&
+			VectorCompare(part->avelocity, vec3_origin))
+		{
+			continue;
+		}
+
+		VectorScale(part->velocity, FRAMETIME, move);
+		VectorScale(part->avelocity, FRAMETIME, amove);
+
+		obstacle = SV_Push(part, move, amove);
+		if (obstacle)
+		{
+			break;
 		}
 	}
 
@@ -837,7 +862,7 @@ SV_Physics_Pusher(edict_t *ent)
 /*
  * Non moving objects can only think
  */
-void
+static void
 SV_Physics_None(edict_t *ent)
 {
   	if (!ent)
@@ -852,7 +877,7 @@ SV_Physics_None(edict_t *ent)
 /*
  * A moving object that doesn't obey physics
  */
-void
+static void
 SV_Physics_Noclip(edict_t *ent)
 {
   	if (!ent)
@@ -879,7 +904,7 @@ SV_Physics_Noclip(edict_t *ent)
 /*
  * Toss, bounce, and fly movement.  When onground, do nothing.
  */
-void
+static void
 SV_Physics_Toss(edict_t *ent)
 {
 	trace_t trace;
@@ -1039,7 +1064,7 @@ SV_Physics_Toss(edict_t *ent)
  * will fall if the floor is pulled out from under them.
  */
 
-void
+static void
 SV_AddRotationalFriction(edict_t *ent)
 {
 	int n;
@@ -1076,7 +1101,7 @@ SV_AddRotationalFriction(edict_t *ent)
 	}
 }
 
-void
+static void
 SV_Physics_Step(edict_t *ent)
 {
 	qboolean wasonground;
